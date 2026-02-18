@@ -42,6 +42,13 @@ const getGroupStudents = (groupName, onlyPresent = false) => {
     return result;
 }
 
+const getAllGroups = () => {
+    const groups = students
+        .filter(s => s.step === "REGISTERED" && s.group)
+        .map(s => s.group);
+    return [...new Set(groups)];
+}
+
 if (!process.env.BOT_TOKEN) {
     console.error('Ошибка: BOT_TOKEN не найден в .env файле');
     process.exit(1);
