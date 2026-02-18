@@ -235,10 +235,14 @@ bot.action('not_here', (ctx) => {
 bot.action('im_student', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (student) {
-        student.role = 'Студент';
-        student.step = 'REGISTERED';
-        save();
+    if (!student) {
+        ctx.answerCbQuery();
+        ctx.editMessageText("Ошибка: студент не найден")
+    }
+
+    student.role = 'Студент';
+    student.step = 'WAITING_FOR_GROUP_SELECTION';
+    save();
 
         return ctx.editMessageText(`Регистрация закончилась! Теперь я знаю, что ты студент группы ${student.group}.`)
     }
