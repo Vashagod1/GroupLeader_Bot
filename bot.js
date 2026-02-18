@@ -244,7 +244,10 @@ bot.action('im_student', (ctx) => {
     student.step = 'WAITING_FOR_GROUP_SELECTION';
     save();
 
-        return ctx.editMessageText(`Регистрация закончилась! Теперь я знаю, что ты студент группы ${student.group}.`)
+    const group = getAllGroups();
+
+    if (group.length === 0) {
+        return ctx.editMessageText("Пока нету зарегистрированных групп. Обратись к старосте,")
     }
 
     ctx.answerCbQuery();
