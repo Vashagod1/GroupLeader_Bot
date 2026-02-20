@@ -23,7 +23,7 @@ const normalizeName = (text) => {
         )
         .join('');
 }
-const isAuthorizedStarosta = (student) => {
+const isAuthorizedGroupLeader = (student) => {
     if (!student) return false;
     if (student.step !== "REGISTERED") return false;
     return student.role === "Староста";
@@ -85,6 +85,8 @@ bot.command('list', (ctx) => {
 
     if (!isAuthorizedStarosta(student)) {
         return ctx.reply("У тебя нету доступа");
+    if (!isAuthorizedGroupLeader(student)) {
+        return ctx.reply("У вас нет доступа");
     }
 
     const currentGroup = getGroupStudents(student.group)
@@ -117,6 +119,8 @@ bot.command('check', (ctx) => {
 
     if (!isAuthorizedStarosta(student)) {
         return ctx.reply("У тебя нету доступа");
+    if (!isAuthorizedGroupLeader(student)) {
+        return ctx.reply("У вас нет доступа");
     }
     const currentGroup = getGroupStudents(student.group);
 
@@ -144,6 +148,8 @@ bot.command('report', async (ctx) => {
 
     if (!isAuthorizedStarosta(student)) {
         return ctx.reply("У тебя нету доступа");
+    if (!isAuthorizedGroupLeader(student)) {
+        return ctx.reply("У вас нет доступа");
     }
 
     const currentGroup = getGroupStudents(student.group, true);
