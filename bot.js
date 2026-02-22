@@ -83,8 +83,8 @@ bot.start((ctx) => {
 bot.command('list', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (!isAuthorizedStarosta(student)) {
-        return ctx.reply("У тебя нету доступа");
+    if (!student) return ctx.reply("Сначала зарегистрируйся через /start")
+
     if (!isAuthorizedGroupLeader(student)) {
         return ctx.reply("У вас нет доступа");
     }
@@ -117,8 +117,8 @@ bot.command('list', (ctx) => {
 bot.command('check', (ctx) => {
     const student = getStudent(ctx.from.id);
 
-    if (!isAuthorizedStarosta(student)) {
-        return ctx.reply("У тебя нету доступа");
+    if (!student) return ctx.reply("Сначала зарегистрируйся через /start")
+
     if (!isAuthorizedGroupLeader(student)) {
         return ctx.reply("У вас нет доступа");
     }
@@ -146,8 +146,8 @@ bot.command('check', (ctx) => {
 bot.command('report', async (ctx) => {
     const student = getStudent(ctx.from.id);
 
-    if (!isAuthorizedStarosta(student)) {
-        return ctx.reply("У тебя нету доступа");
+    if (!student) return ctx.reply("Сначала зарегистрируйся через /start")
+
     if (!isAuthorizedGroupLeader(student)) {
         return ctx.reply("У вас нет доступа");
     }
