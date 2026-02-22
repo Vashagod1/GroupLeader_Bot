@@ -23,7 +23,7 @@ const normalizeName = (text) => {
         )
         .join('');
 }
-const isAuthorizedStarosta = (student) => {
+const isAuthorizedGroupLeader = (student) => {
     if (!student) return false;
     if (student.step !== "REGISTERED") return false;
     return student.role === "Староста";
@@ -40,6 +40,13 @@ const getGroupStudents = (groupName, onlyPresent = false) => {
     }
 
     return result;
+}
+
+const getAllGroups = () => {
+    const groups = students
+        .filter(s => s.step === "REGISTERED" && s.group)
+        .map(s => s.group);
+    return [...new Set(groups)];
 }
 
 if (!process.env.BOT_TOKEN) {
@@ -76,8 +83,10 @@ bot.start((ctx) => {
 bot.command('list', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (!isAuthorizedStarosta(student)) {
-        return ctx.reply("У тебя нету доступа");
+    if (!student) return ctx.reply("Сначала зарегистрируйся через /start")
+
+    if (!isAuthorizedGroupLeader(student)) {
+        return ctx.reply("У вас нет доступа");
     }
 
     const currentGroup = getGroupStudents(student.group)
@@ -108,8 +117,10 @@ bot.command('list', (ctx) => {
 bot.command('check', (ctx) => {
     const student = getStudent(ctx.from.id);
 
-    if (!isAuthorizedStarosta(student)) {
-        return ctx.reply("У тебя нету доступа");
+    if (!student) return ctx.reply("Сначала зарегистрируйся через /start")
+
+    if (!isAuthorizedGroupLeader(student)) {
+        return ctx.reply("У вас нет доступа");
     }
     const currentGroup = getGroupStudents(student.group);
 
@@ -124,7 +135,7 @@ bot.command('check', (ctx) => {
                     Markup.button.callback('Я не приду', 'not_here')
                 ])
             ).catch(err => {
-                console.log(`Не удалось отправить сообщение студенту ${member.name}: Чат не найден.`)
+                console.log(`Не удалось отправить сообщение студенту ${member.name}: ${err.message}`)
             })
         }
     });
@@ -135,12 +146,13 @@ bot.command('check', (ctx) => {
 bot.command('report', async (ctx) => {
     const student = getStudent(ctx.from.id);
 
-    if (!isAuthorizedStarosta(student)) {
-        return ctx.reply("У тебя нету доступа");
+    if (!student) return ctx.reply("Сначала зарегистрируйся через /start")
+
+    if (!isAuthorizedGroupLeader(student)) {
+        return ctx.reply("У вас нет доступа");
     }
 
     const currentGroup = getGroupStudents(student.group, true);
-
 
     let reportText = `Присутствующие студенты группы ${student.group}:
 Дата: ${new Date().toLocaleDateString()}
@@ -225,20 +237,36 @@ bot.action('not_here', (ctx) => {
     ctx.editMessageText("Понял, отмечу старосте про тебя");
 })
 
-bot.action('im_student', (ctx) => {
+bot.action('role_student', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (student) {
-        student.role = 'Студент';
-        student.step = 'REGISTERED';
-        save();
-
-        return ctx.editMessageText(`Регистрация закончилась! Теперь я знаю, что ты студент группы ${student.group}.`)
+    if (!student) {
+        ctx.answerCbQuery();
+        ctx.editMessageText("Ошибка: студент не найден")
     }
 
+    student.role = 'Студент';
+    student.step = 'WAITING_FOR_GROUP_SELECTION';
+    save();
+
+    const groups = getAllGroups();
+
+    if (groups.length === 0) {
+        return ctx.editMessageText("Пока нету зарегистрированных групп. Обратись к старосте,")
+    }
+
+    const buttons = groups.map(group =>
+        Markup.button.callback(group, `select_group_${group}`)
+    );
     ctx.answerCbQuery();
+
+    return ctx.editMessageText(
+        "Выберите группу:",
+        Markup.inlineKeyboard(buttons, {columns: 2})
+    );
 })
-bot.action('im_starosta', (ctx) => {
+
+bot.action('role_leader', (ctx) => {
     const student = getStudent(ctx.from.id)
 
     if (!student) {
@@ -246,19 +274,81 @@ bot.action('im_starosta', (ctx) => {
         return ctx.editMessageText("Ученик не найден")
     }
 
-    let currentLeader = students.find(s => s.group === student.group && s.role === "Староста");
-
-    if (currentLeader) {
-        ctx.answerCbQuery();
-        return ctx.editMessageText("Ты не можешь быть старостой этой группы")
-    }
-
     student.role = "Староста";
-    student.step = "REGISTERED";
-    save()
+    student.step = "WAITING_FOR_GROUP_SELECTION";
+    save();
+
+    const groups = getAllGroups();
+    const buttons = groups.map(group =>
+        Markup.button.callback(group, `select_group_${group}`)
+    );
+
+
+    buttons.push(Markup.button.callback('Новая группы', 'create_new_group'));
 
     ctx.answerCbQuery();
-    return ctx.editMessageText(`Регистрация закончилась, рад познакомиться ${student.name} из группы ${student.group}:`)
+    return ctx.editMessageText(
+        "Выбери свою группу или создай",
+        Markup.inlineKeyboard(buttons, {columns: 2})
+    );
+});
+
+bot.action(/selected_group_(.+)/, (ctx) => {
+    const groupName = ctx.match[1];
+    const student = getStudent(ctx.from.id);
+
+    if (!student) {
+        ctx.answerCbQuery();
+        return ctx.editMessageText("Ошибка: студент не найден")
+    }
+
+    if (student.step !== "WAITING_FOR_GROUP_SELECTION") {
+        ctx.answerCbQuery();
+
+        return ctx.editMessageText("Ошибка, ты не выбрал группу")
+    }
+
+    if (student.role === "Студент") {
+        student.group = groupName;
+        student.step = "REGISTERED";
+        save();
+
+        ctx.answerCbQuery();
+        return ctx.editMessageText(`Записал, ты в группе ${student.group}`)
+    }
+
+    if (student.role === "Староста") {
+        const existingLeader = students.find(s =>
+            s.group === groupName &&
+            s.role === "Староста"
+        )
+
+        if (existingLeader) {
+            ctx.answerCbQuery();
+            return ctx.editMessageText("В этой группе есть староста.")
+        }
+
+        student.group = groupName;
+        student.step = "REGISTERED";
+        save();
+
+        ctx.answerCbQuery();
+        return ctx.editMessageText(`Ты зарегистрирован как староста группы ${student.group}`)
+    }
+})
+
+bot.action('create_new_group', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    if (!student) {
+        ctx.answerCbQuery();
+        return ctx.editMessageText("Ошибка: студент не найден")
+    }
+
+    student.step = "WAITING_FOR_NEW_GROUP";
+    save();
+    ctx.answerCbQuery();
+    return ctx.editMessageText("Введи название группы")
 })
 
 bot.on('text', (ctx) => {
@@ -271,23 +361,26 @@ bot.on('text', (ctx) => {
             return ctx.reply("Неправильно введено имя. Введи своё имя пожалуйста");
         }
         student.name = cleanName;
-        student.step = 'WAITING_FOR_GROUP';
-        save();
-        ctx.reply(`Приятно познакомиться, ${student.name}! Из какой ты группы?`);
-    } else if (student.step === 'WAITING_FOR_GROUP') {
-        const cleanedGroup = normalizeGroup(userText);
-
-        if (cleanedGroup.length > 12) return ctx.reply("Слишком много, попробуй ещё раз")
-
-        student.group = cleanedGroup;
         student.step = 'WAITING_FOR_ROLE';
         save();
-        ctx.reply(`Так и записал, группа ${student.group}. Кем ты являешься в группе?`,
+
+        return ctx.reply(`Приятно познакомиться, ${student.name}! Кто ты в колледже?`,
             Markup.inlineKeyboard([
-                Markup.button.callback('Я староста', 'im_starosta'),
-                Markup.button.callback('Я студент', 'im_student')
+                Markup.button.callback('Я староста', 'role_leader'),
+                Markup.button.callback('Я студент', 'role_student')
             ])
         )
+    } else if (student.step === 'WAITING_FOR_NEW_GROUP') {
+        const cleanGroup = normalizeGroup(userText);
+
+        if (cleanGroup > 15) {
+            return ctx.reply("Название группы длинное");
+        }
+
+        student.group = cleanGroup;
+        student.step = "REGISTERED";
+        save();
+        ctx.reply(`Все записал, студент ${student.name} из группы ${student.group}`);
     }
 });
 
