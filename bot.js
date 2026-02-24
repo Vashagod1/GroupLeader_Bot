@@ -67,7 +67,9 @@ bot.start((ctx) => {
             group: null,
             role: null,
             isPresent: null,
-            lastChecked: null
+            lastChecked: null,
+            editAttempts: 0,
+            lastEditDate: null
         });
         save();
         return ctx.reply("Привет! Я тебя запомнил, как тебя зовут?");
@@ -96,12 +98,12 @@ bot.command('list', (ctx) => {
     const sorted = [...currentGroup].sort((a, b) => a.name.localeCompare(b.name));
 
     const presentCount = sorted.filter(s => s.isPresent === true).length;
-    const abscentCount = sorted.filter(s => s.isPresent === false).length;
+    const absentCount = sorted.filter(s => s.isPresent === false).length;
     const unknownCount = sorted.filter(s => s.isPresent === null).length;
 
     let text = `Список группы ${student.group}:\n`;
     text += `Присутствуют ${presentCount}\n`;
-    text += `Отсутствуют ${abscentCount}\n`;
+    text += `Отсутствуют ${absentCount}\n`;
     text += `Пока не ответили ${unknownCount}\n`;
     text += `Всего студентов: ${sorted.length}\n\n`;
     text += "Список:\n";
@@ -214,27 +216,70 @@ bot.command('help', (ctx) => {
 bot.action('im_here', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (student) {
-        student.isPresent = true;
-        student.lastChecked = new Date().toISOString();
-        save();
+    if (!student) {
+        ctx.answerCbQuery();
+        return ctx.editMessageText("Ошибка: студент не найден");
     }
 
+    student.isPresent = true;
+    student.lastChecked = new Date().toISOString();
+    student.editAttempts = (student.editAttempts || 0) + 1;
+    student.lastEditDate = new Date().toISOString();
+    save();
+
     ctx.answerCbQuery();
-    ctx.editMessageText("Спасибо! Твоё присутствие отмечено.");
+    ctx.editMessageText(
+        "Спасибо! Твоё присутствие отмечено.",
+        Markup.inlineKeyboard([Markup.button.callback('Изменить', 'edit_mark')]));
 });
 
 bot.action('not_here', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (student) {
-        student.isPresent = false;
-        student.lastChecked = new Date().toISOString();
+    if (!student) {
+        ctx.answerCbQuery();
+        return ctx.editMessageText("Ошибка: студент не найден");
+    }
+
+    student.isPresent = false;
+    student.lastChecked = new Date().toISOString();
+    student.editAttempts = (student.editAttempts || 0) + 1;
+    student.lastEditDate = new Date().toISOString();
+    save();
+
+
+    ctx.answerCbQuery();
+    ctx.editMessageText(
+        "Понял, отмечу старосте про тебя",
+        Markup.inlineKeyboard([Markup.button.callback('Изменить', 'edit_mark')])
+    )
+})
+
+bot.action('edit_mark', (ctx) => {
+    const student = getStudent(ctx.from.id)
+    const today = new Date().toDateString();
+    const lastEdit = student.lastEditDate ? new Date(student.lastEditDate).toDateString() : null;
+
+    if (lastEdit !== today) {
+        student.editAttempts = 0;
         save();
     }
 
+    if (student.editAttempts >= 2) {
+        ctx.answerCbQuery();
+        ctx.editMessageText("На сегодня нельзя больше менять",
+            Markup.inlineKeyboard([])
+        );
+    }
+
     ctx.answerCbQuery();
-    ctx.editMessageText("Понял, отмечу старосте про тебя");
+    ctx.editMessageText(
+        "Выбери статус",
+        Markup.inlineKeyboard([
+            Markup.button.callback('Я тут!', 'im_here'),
+            Markup.button.callback('Я не приду', 'not_here'),
+        ])
+    )
 })
 
 bot.action('role_student', (ctx) => {
@@ -380,7 +425,7 @@ bot.on('text', (ctx) => {
         student.group = cleanGroup;
         student.step = "REGISTERED";
         save();
-        ctx.reply(`Все записал, студент ${student.name} из группы ${student.group}`);
+        ctx.reply(`Все записал, студент ${student.name} из группы ${student.group}. Теперь ты можешь пользоваться и добавлять своих одногруппников`);
     }
 });
 
