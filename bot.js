@@ -396,6 +396,60 @@ bot.action('create_new_group', (ctx) => {
     return ctx.editMessageText("Введи название группы")
 })
 
+bot.command('editname', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    if (!student) {
+        ctx.reply("Ошибка: студент не найден");
+    }
+
+    return ctx.reply(
+        `${student.name}, ты хочешь поменять имя?`,
+        Markup.inlineKeyboard([
+            Markup.button.callback('Да', 'confirm_edit_name'),
+            Markup.button.callback('Нет', 'cancel_edit_name')
+        ]));
+})
+
+bot.action('confirm_edit_name', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    student.step = 'EDIT_NAME';
+    save();
+
+    ctx.answerCbQuery();
+    ctx.editMessageText("Введи имя")
+})
+
+bot.action('cancel_edit_name', (ctx) => {
+    ctx.editMessageText("Хорошо, как скажешь")
+})
+
+bot.action('confirm_name', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    student.step = "WAITING_FOR_ROLE";
+    save();
+
+    ctx.answerCbQuery();
+    ctx.editMessageText(`Приятно познакомиться, ${student.name}! Кто ты в колледже?`,
+        Markup.inlineKeyboard([
+            Markup.button.callback('Я староста', 'role_leader'),
+            Markup.button.callback('Я студент', 'role_student')
+        ])
+    );
+})
+
+bot.action('edit_name_at_reg', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    student.step = 'WAITING_FOR_NAME';
+    save();
+
+    ctx.answerCbQuery();
+    ctx.editMessageText("Введи имя заново:")
+})
+
 bot.on('text', (ctx) => {
     const userText = ctx.message.text;
     const student = getStudent(ctx.from.id);
@@ -405,16 +459,16 @@ bot.on('text', (ctx) => {
         if (cleanName.length < 2 || cleanName.length > 50) {
             return ctx.reply("Неправильно введено имя. Введи своё имя пожалуйста");
         }
+
         student.name = cleanName;
-        student.step = 'WAITING_FOR_ROLE';
         save();
 
-        return ctx.reply(`Приятно познакомиться, ${student.name}! Кто ты в колледже?`,
+        return ctx.reply(`${cleanName}, всё верно?`,
             Markup.inlineKeyboard([
-                Markup.button.callback('Я староста', 'role_leader'),
-                Markup.button.callback('Я студент', 'role_student')
+                Markup.button.callback("Да", "confirm_name"),
+                Markup.button.callback("Не правильно", "edit_name_at_reg")
             ])
-        )
+        );
     } else if (student.step === 'WAITING_FOR_NEW_GROUP') {
         const cleanGroup = normalizeGroup(userText);
 
@@ -425,7 +479,19 @@ bot.on('text', (ctx) => {
         student.group = cleanGroup;
         student.step = "REGISTERED";
         save();
-        ctx.reply(`Все записал, студент ${student.name} из группы ${student.group}. Теперь ты можешь пользоваться и добавлять своих одногруппников`);
+        ctx.reply(`Все записал, староста ${student.name} из группы ${student.group}. Теперь ты можешь пользоваться и добавлять своих одногруппников`);
+    } else if (student.step === 'EDIT_NAME') {
+        const cleanName = normalizeName(userText);
+
+        if (cleanName.length < 2 || cleanName.length > 50) {
+            return ctx.reply("Некорректно введено имя");
+        }
+
+        student.name = cleanName;
+        student.step = 'REGISTERED';
+        save();
+
+        ctx.reply(`Имя изменено на ${student.name}`);
     }
 });
 
