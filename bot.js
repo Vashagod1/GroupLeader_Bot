@@ -131,7 +131,7 @@ bot.command('check', (ctx) => {
     currentGroup.forEach(member => {
         member.isPresent = null;
         if (member.id && member.step === 'REGISTERED') {
-            bot.telegram.sendMessage(member.id, `${member.name} ты придёшь на пару?`,
+            bot.telegram.sendMessage(member.id, `${member.name}, ты придёшь на пару?`,
                 Markup.inlineKeyboard([
                     Markup.button.callback('Я тут!', 'im_here'),
                     Markup.button.callback('Я не приду', 'not_here')
@@ -297,7 +297,7 @@ bot.action('role_student', (ctx) => {
     const groups = getAllGroups();
 
     if (groups.length === 0) {
-        return ctx.editMessageText("Пока нету зарегистрированных групп. Обратись к старосте,")
+        return ctx.editMessageText("Пока нету зарегистрированных групп. Обратись к старосте")
     }
 
     const buttons = groups.map(group =>
@@ -338,7 +338,7 @@ bot.action('role_leader', (ctx) => {
     );
 });
 
-bot.action(/selected_group_(.+)/, (ctx) => {
+bot.action(/select_group_(.+)/, (ctx) => {
     const groupName = ctx.match[1];
     const student = getStudent(ctx.from.id);
 
@@ -472,7 +472,7 @@ bot.on('text', (ctx) => {
     } else if (student.step === 'WAITING_FOR_NEW_GROUP') {
         const cleanGroup = normalizeGroup(userText);
 
-        if (cleanGroup > 15) {
+        if (cleanGroup.length > 15) {
             return ctx.reply("Название группы длинное");
         }
 
