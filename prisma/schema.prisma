@@ -1,0 +1,35 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+model User {
+  id               BigInt       @id
+  firstName        String
+  lastName         String
+  groupName        String
+  role             String       @default("student")
+  step             String       @default("idle")
+  registrationDate DateTime     @default(now())
+  attendances      Attendance[]
+}
+
+model Group {
+  groupName String  @id
+  leaderId  BigInt?
+  startTime String  @default("08:00")
+  endTime   String  @default("09:00")
+  autoPoll  Boolean @default(true)
+}
+
+model Attendance {
+  id     Int      @id @default(autoincrement())
+  date   DateTime @default(now())
+  status String
+  userId BigInt
+  user   User     @relation(fields: [userId], references: [id])
+}
