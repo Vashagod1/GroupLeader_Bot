@@ -67,7 +67,9 @@ bot.start((ctx) => {
             group: null,
             role: null,
             isPresent: null,
-            lastChecked: null
+            lastChecked: null,
+            editAttempts: 0,
+            lastEditDate: null
         });
         save();
         return ctx.reply("Привет! Я тебя запомнил, как тебя зовут?");
@@ -214,27 +216,70 @@ bot.command('help', (ctx) => {
 bot.action('im_here', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (student) {
-        student.isPresent = true;
-        student.lastChecked = new Date().toISOString();
-        save();
+    if (!student) {
+        ctx.answerCbQuery();
+        return ctx.editMessageText("Ошибка: студент не найден");
     }
 
+    student.isPresent = true;
+    student.lastChecked = new Date().toISOString();
+    student.editAttempts = (student.editAttempts || 0) + 1;
+    student.lastEditDate = new Date().toISOString();
+    save();
+
     ctx.answerCbQuery();
-    ctx.editMessageText("Спасибо! Твоё присутствие отмечено.");
+    ctx.editMessageText(
+        "Спасибо! Твоё присутствие отмечено.",
+        Markup.inlineKeyboard([Markup.button.callback('Изменить', 'edit_mark')]));
 });
 
 bot.action('not_here', (ctx) => {
     const student = getStudent(ctx.from.id)
 
-    if (student) {
-        student.isPresent = false;
-        student.lastChecked = new Date().toISOString();
+    if (!student) {
+        ctx.answerCbQuery();
+        return ctx.editMessageText("Ошибка: студент не найден");
+    }
+
+    student.isPresent = false;
+    student.lastChecked = new Date().toISOString();
+    student.editAttempts = (student.editAttempts || 0) + 1;
+    student.lastEditDate = new Date().toISOString();
+    save();
+
+
+    ctx.answerCbQuery();
+    ctx.editMessageText(
+        "Понял, отмечу старосте про тебя",
+        Markup.inlineKeyboard([Markup.button.callback('Изменить', 'edit_mark')])
+    )
+})
+
+bot.action('edit_mark', (ctx) => {
+    const student = getStudent(ctx.from.id)
+    const today = new Date().toDateString();
+    const lastEdit = student.lastEditDate ? new Date(student.lastEditDate).toDateString() : null;
+
+    if (lastEdit !== today) {
+        student.editAttempts = 0;
         save();
     }
 
+    if (student.editAttempts >= 2) {
+        ctx.answerCbQuery();
+        ctx.editMessageText("На сегодня нельзя больше менять",
+            Markup.inlineKeyboard([])
+        );
+    }
+
     ctx.answerCbQuery();
-    ctx.editMessageText("Понял, отмечу старосте про тебя");
+    ctx.editMessageText(
+        "Выбери статус",
+        Markup.inlineKeyboard([
+            Markup.button.callback('Я тут!', 'im_here'),
+            Markup.button.callback('Я не приду', 'not_here'),
+        ])
+    )
 })
 
 bot.action('role_student', (ctx) => {
@@ -360,16 +405,16 @@ bot.on('text', (ctx) => {
         if (cleanName.length < 2 || cleanName.length > 50) {
             return ctx.reply("Неправильно введено имя. Введи своё имя пожалуйста");
         }
+
         student.name = cleanName;
-        student.step = 'WAITING_FOR_ROLE';
         save();
 
-        return ctx.reply(`Приятно познакомиться, ${student.name}! Кто ты в колледже?`,
+        return ctx.reply(`${cleanName}, всё верно?`,
             Markup.inlineKeyboard([
-                Markup.button.callback('Я староста', 'role_leader'),
-                Markup.button.callback('Я студент', 'role_student')
+                Markup.button.callback("Да", "confirm_name"),
+                Markup.button.callback("Не правильно", "edit_name_at_reg")
             ])
-        )
+        );
     } else if (student.step === 'WAITING_FOR_NEW_GROUP') {
         const cleanGroup = normalizeGroup(userText);
 
