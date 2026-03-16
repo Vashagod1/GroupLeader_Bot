@@ -101,12 +101,12 @@ bot.command('list', (ctx) => {
     const sorted = [...currentGroup].sort((a, b) => a.name.localeCompare(b.name));
 
     const presentCount = sorted.filter(s => s.isPresent === true).length;
-    const abscentCount = sorted.filter(s => s.isPresent === false).length;
+    const absentCount = sorted.filter(s => s.isPresent === false).length;
     const unknownCount = sorted.filter(s => s.isPresent === null).length;
 
     let text = `Список группы ${student.group}:\n`;
     text += `Присутствуют ${presentCount}\n`;
-    text += `Отсутствуют ${abscentCount}\n`;
+    text += `Отсутствуют ${absentCount}\n`;
     text += `Пока не ответили ${unknownCount}\n`;
     text += `Всего студентов: ${sorted.length}\n\n`;
     text += "Список:\n";
@@ -134,7 +134,7 @@ bot.command('check', (ctx) => {
     currentGroup.forEach(member => {
         member.isPresent = null;
         if (member.id && member.step === 'REGISTERED') {
-            bot.telegram.sendMessage(member.id, `${member.name} ты придёшь на пару?`,
+            bot.telegram.sendMessage(member.id, `${member.name}, ты придёшь на пару?`,
                 Markup.inlineKeyboard([
                     Markup.button.callback('Я тут!', 'im_here'),
                     Markup.button.callback('Я не приду', 'not_here')
@@ -339,7 +339,7 @@ bot.action('role_leader', (ctx) => {
     )
 });
 
-bot.action(/selected_group_(.+)/, (ctx) => {
+bot.action(/select_group_(.+)/, (ctx) => {
     const groupName = ctx.match[1];
     const student = getStudent(ctx.from.id);
 
@@ -499,14 +499,14 @@ bot.on('text', (ctx) => {
     } else if (student.step === 'WAITING_FOR_NEW_GROUP') {
         const cleanGroup = normalizeGroup(userText);
 
-        if (cleanGroup > 15) {
+        if (cleanGroup.length > 15) {
             return ctx.reply("Название группы длинное");
         }
 
         student.group = cleanGroup;
         student.step = "REGISTERED";
         save();
-        ctx.reply(`Все записал, студент ${student.name} из группы ${student.group}`);
+        return ctx.reply(`Все записал, староста ${student.name} из группы ${student.group}. Теперь ты можешь пользоваться и добавлять своих одногруппников`);
     } else if (student.step === 'EDIT_NAME') {
         const cleanName = normalizeName(userText);
 
