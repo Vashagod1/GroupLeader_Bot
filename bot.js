@@ -216,6 +216,21 @@ bot.command('help', (ctx) => {
     ctx.reply(helpText);
 })
 
+bot.command('editname', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    if (!student) {
+        return ctx.reply("Сначала зарегистрируйся через /start");
+    }
+
+    return ctx.reply(
+        `${student.name}, ты хочешь поменять имя?`,
+        Markup.inlineKeyboard([
+            Markup.button.callback('Да', 'confirm_edit_name'),
+            Markup.button.callback('Нет', 'cancel_edit_name')
+        ]));
+})
+
 bot.action('im_here', (ctx) => {
     const student = getStudent(ctx.from.id)
 
@@ -382,6 +397,45 @@ bot.action('create_new_group', (ctx) => {
     return ctx.editMessageText("Введи название группы")
 })
 
+bot.action('confirm_edit_name', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    student.step = 'EDIT_NAME';
+    save();
+
+    ctx.answerCbQuery();
+    ctx.editMessageText("Введи имя")
+})
+
+bot.action('cancel_edit_name', (ctx) => {
+    ctx.editMessageText("Хорошо, как скажешь")
+})
+
+bot.action('confirm_name', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    student.step = "WAITING_FOR_ROLE";
+    save();
+
+    ctx.answerCbQuery();
+    ctx.editMessageText(`Приятно познакомиться, ${student.name}! Кто ты в колледже?`,
+        Markup.inlineKeyboard([
+            Markup.button.callback('Я староста', 'role_leader'),
+            Markup.button.callback('Я студент', 'role_student')
+        ])
+    );
+})
+
+bot.action('edit_name_at_reg', (ctx) => {
+    const student = getStudent(ctx.from.id);
+
+    student.step = 'WAITING_FOR_NAME';
+    save();
+
+    ctx.answerCbQuery();
+    ctx.editMessageText("Введи имя заново:")
+})
+
 bot.action('confirm_role', (ctx) => {
     const student = getStudent(ctx.from.id);
     const tempRole = ctx.session?.tempRole;
@@ -453,6 +507,20 @@ bot.on('text', (ctx) => {
         student.step = "REGISTERED";
         save();
         ctx.reply(`Все записал, студент ${student.name} из группы ${student.group}`);
+    } else if (student.step === 'EDIT_NAME') {
+        const cleanName = normalizeName(userText);
+
+        if (cleanName.length < 2 || cleanName.length > 50) {
+            return ctx.reply("Некорректно введено имя");
+        }
+
+        student.name = cleanName;
+        student.step = 'REGISTERED';
+        save();
+
+        return ctx.reply(`Имя изменено на ${student.name}`);
+    } else if (student.step === 'REGISTERED') {
+        return ctx.reply("Я пока что, понимаю только через кнопки или команды. Напиши /help, чтобы ознакомиться с командами")
     }
 });
 
