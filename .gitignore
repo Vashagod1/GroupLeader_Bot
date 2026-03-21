@@ -2,5 +2,6 @@
 node_modules/
 .env
 *.log
-.idea
+.idea/
 students.json
+/generated/prisma
