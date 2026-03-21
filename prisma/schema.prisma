@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  telegramId BigInt   @unique
+  firstName  String
+  lastName   String
+  role       Role     @default(STUDENT)
+  groupId    String?
+  group      Group?   @relation(fields: [groupId], references: [id])
+  answers    Answer[]
+}
+
+model Group {
+  id          String @id @default(uuid())
+  title       String
+  surveyStart String @default("07:00")
+  surveyEnd   String @default("09:00")
+  students    User[]
+}
+
+model Answer {
+  id        String   @id @default(uuid())
+  date      DateTime @default(now())
+  isPresent Boolean
+  reason    String?
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id])
+}
+
+enum Role {
+  STAROSTA
+  STUDENT
+}

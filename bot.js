@@ -1,20 +1,13 @@
 require('dotenv').config();
+import 'dotenv/config';
+import {Telegraf, Markup, session} from "telegraf";
 
-const {Telegraf} = require("telegraf");
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const {Markup} = require("telegraf");
-const fs = require('fs');
-const DATA_PATH = './students.json';
-const {session} = require('telegraf')
 
 bot.use(session());
 
 let students = [];
-if (fs.existsSync(DATA_PATH)) {
-    students = JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
-}
 
-const save = () => fs.writeFileSync(DATA_PATH, JSON.stringify(students, null, 2));
 const getStudent = (id) => students.find(s => s.id === id);
 const normalizeGroup = (text) => text.trim().toUpperCase().replace(/\s+/g, '');
 const normalizeName = (text) => {
